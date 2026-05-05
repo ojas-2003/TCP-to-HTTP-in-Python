@@ -15,3 +15,9 @@ if __name__ == '__main__':
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
 
+import socket
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(("127.0.0.1", 8080))
+s.send(b"GET / HTTP/1.1\r\nBadHeaderNoColon\r\nHost: localhost\r\n\r\n")
+s.close()

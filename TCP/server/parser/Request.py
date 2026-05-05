@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from urllib.parse import unquote
 import socket
+
+from TCP.server.parser.headers import parse_headers, Headers
 from exceptions import MalformedRequestLineError, MethodNotAllowedError, UnsupportedVersionError
 
 VALID_METHODS = {"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}
@@ -17,7 +19,7 @@ class RequestLine:
 @dataclass
 class HTTPRequest:
     request_line: RequestLine
-    headers: dict
+    headers: Headers
     body: bytes
 
     def __str__(self):
@@ -27,7 +29,7 @@ class HTTPRequest:
             f"Path:    {rl.path}\n"
             f"Query:   {rl.query_params}\n"
             f"Version: {rl.version}\n"
-            f"Headers: {self.headers}\n"
+            f"Headers: {self.headers.to_dict()}\n"
             f"Body:    {self.body.decode('utf-8', errors='replace')}"
         )
 
@@ -77,11 +79,7 @@ def parse_request(conn) -> HTTPRequest:
 
     request_line = parse_request_line(lines[0])
 
-    headers = {}
-    for line in lines[1:]:
-        if ":" in line:
-            key, value = line.split(":", 1)
-            headers[key.lower()] = value
+    headers = parse_headers(lines[1:])
 
     content_length = int(headers.get("content-length", 0))
     body = partial_body

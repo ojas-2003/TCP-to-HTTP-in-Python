@@ -17,3 +17,5 @@ class UnsupportedVersionError(HTTPParseError):
 class MalformedRequestLineError(HTTPParseError):
     """Raised when the request line structure is invalid."""
     pass
+class MalformedHeaderError(HTTPParseError):
+    pass
