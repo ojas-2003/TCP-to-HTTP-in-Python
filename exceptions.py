@@ -19,3 +19,6 @@ class MalformedRequestLineError(HTTPParseError):
     pass
 class MalformedHeaderError(HTTPParseError):
     pass
+
+class MalformedBodtError(HTTPParseError):
+    pass
