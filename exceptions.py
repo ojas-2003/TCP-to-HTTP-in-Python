@@ -22,3 +22,7 @@ class MalformedHeaderError(HTTPParseError):
 
 class MalformedBodtError(HTTPParseError):
     pass
+
+
+class HTTPResponseError(HTTPParseError):
+    pass
