@@ -1,7 +1,10 @@
 # server/tcp_server.py
 
 import socket
+import time
 
+from TCP.server import response
+from TCP.server.ChunkedResponse import ChunkedResponse
 from TCP.server.parser.Request import parse_request
 from TCP.server.response import HTTPResponse, send_response
 from exceptions import (
@@ -38,6 +41,25 @@ def handle_request(conn, addr):
         elif path == "/users" and method == "DELETE":
             response = HTTPResponse.method_not_allowed(["GET", "POST"])
 
+        elif path == "/stream" and method == "GET":
+            def word_generator():
+                words = ["Chunked", " ", "Transfer", " ", "Encoding", " ", "Works!"]
+                for word in words:
+                    time.sleep(0.1)   # simulate delay
+                    yield word
+
+            response = ChunkedResponse(content_type="text/plain")
+            response.stream(conn, word_generator())
+            return
+        elif path == "/stream/json" and method == "GET":
+            # Stream JSON objects one by one
+            response = ChunkedResponse(content_type="application/json")
+            response.send_headers(conn)
+            for i in range(5):
+                time.sleep(0.2)
+                response.send_chunk(conn, f'{{"index": {i}, "value": "item_{i}"}}\n')
+            response.send_end(conn)
+            return
         else:
             response = HTTPResponse.not_found(f"Path '{path}' not found")
 

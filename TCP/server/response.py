@@ -136,3 +136,13 @@ def send_response(conn, response: HTTPResponse):
               f" ({len(data)} bytes)")
     except OSError as e:
         print(f"[ERROR] Failed to send response: {e}")
+
+def encode_chunk(data: bytes) -> bytes:
+    if not data:
+        return b""
+
+    size_hex = format(len(data), "x")
+    return f"{size_hex}\r\n".encode() +  data + b"\r\n"
+
+def encode_terminator() -> bytes:
+    return b"0\r\n\r\n"

@@ -1,23 +1,33 @@
-# This is a sample Python script.
-
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
-
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press ⌘F8 to toggle the breakpoint.
-
-
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
-
 import socket
 
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect(("127.0.0.1", 8080))
-s.send(b"GET / HTTP/1.1\r\nBadHeaderNoColon\r\nHost: localhost\r\n\r\n")
-s.close()
+
+def send_chunked_post():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect(("127.0.0.1", 8080))
+
+    request = (
+        b"POST /users HTTP/1.1\r\n"
+        b"Host: 127.0.0.1:8080\r\n"
+        b"Transfer-Encoding: chunked\r\n"
+        b"Content-Type: application/json\r\n"
+        b"\r\n"
+        b"10\r\n"                       # 0x10 = 16 bytes
+        b'{"name": "Ojas"}\r\n'
+        b"0\r\n"
+        b"\r\n"
+    )
+    s.sendall(request)
+
+    response = b""
+    while True:
+        chunk = s.recv(1024)
+        if not chunk:
+            break
+        response += chunk
+
+    print(response.decode())
+    s.close()
+
+
+if __name__ == '__main__':
+    send_chunked_post()

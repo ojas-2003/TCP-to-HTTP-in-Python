@@ -46,8 +46,12 @@ def read_body(
 
     transfer_encoding = headers.get("transfer-encoding", "").lower()
     if transfer_encoding == "chunked":
-        # Placeholder — Chapter 8 implements this
-        raise NotImplementedError("Chunked encoding will be handled in Chapter 8")
+        if partial_body:
+            # Inject partial body back into a wrapped reader
+            raw = read_chunked_body_with_buffer(conn, partial_body)
+        else:
+            raw = read_chunked_body(conn)
+        return Body(raw=raw, content_type=content_type)
 
     content_length = get_content_length(headers)
     if content_length == 0:
@@ -59,18 +63,15 @@ def read_body(
     body_bytes = partial_body
 
     while len(body_bytes) < content_length:
-        remaining = content_length - len(body_bytes)
-        chunk = conn.recv(min(4096, remaining))
-
+        chunk = conn.recv(min(4096, content_length - len(body_bytes)))
         if not chunk:
             raise MalformedBodtError(
-                f"Connection closed prematurely. "
-                f"Expected {content_length} bytes, got {len(body_bytes)}"
+                f"Connection closed early. Expected {content_length}, got {len(body_bytes)}"
             )
         body_bytes += chunk
-        body_bytes = body_bytes[:content_length]
 
-    return Body(raw=body_bytes, content_type=content_type)
+    return Body(raw=body_bytes[:content_length], content_type=content_type)
+
 
 def validate_body(body: Body) -> Body:
     """
@@ -112,3 +113,91 @@ def parse_form_body(raw: bytes) -> dict:
             result[unquote_plus(pair)] = ""
 
     return result
+
+def read_chunk_size(conn, buffer: bytes) -> tuple[int, bytes]:
+    """
+    Read the hex size line of the next chunk.
+    Returns (chunk_size_as_int, remaining_buffer).
+    """
+    # Read until we find \r\n (end of size line)
+    while b"\r\n" not in buffer:
+        data = conn.recv(1024)
+        if not data:
+            raise MalformedBodtError("Connection closed while reading chunk size")
+        buffer += data
+
+    # Split off the size line
+    size_line, _, buffer = buffer.partition(b"\r\n")
+
+    # Parse hex size — strip any chunk extensions (e.g. '1a;ext=value')
+    size_str = size_line.split(b";")[0].strip()
+
+    try:
+        chunk_size = int(size_str, 16)   # parse hex string → int
+    except ValueError:
+        raise MalformedBodtError(f"Invalid chunk size: '{size_line.decode()}'")
+
+    return chunk_size, buffer
+
+def read_chunk_data(conn, chunk_size: int, buffer: bytes) -> tuple[bytes, bytes]:
+    """
+    Read exactly chunk_size bytes of chunk data plus the trailing \r\n.
+    Returns (chunk_data, remaining_buffer).
+    """
+    # Need chunk_size bytes + 2 bytes for trailing \r\n
+    needed = chunk_size + 2
+
+    while len(buffer) < needed:
+        data = conn.recv(min(4096, needed - len(buffer)))
+        if not data:
+            raise MalformedBodtError("Connection closed while reading chunk data")
+        buffer += data
+
+    chunk_data = buffer[:chunk_size]
+    buffer = buffer[needed:]   # skip chunk_data + \r\n
+
+    return chunk_data, buffer
+
+def read_chunked_body(conn) -> bytes:
+    """
+    Read a full chunked body from the TCP connection.
+
+    Reads chunks one by one until the zero-length terminator,
+    assembles and returns the complete body bytes.
+    """
+    full_body = b""
+    buffer = b""
+
+    while True:
+        # 1. Read the chunk size line (hex)
+        chunk_size, buffer = read_chunk_size(conn, buffer)
+
+        # 2. Zero size = end of body
+        if chunk_size == 0:
+            break
+
+        # 3. Read exactly chunk_size bytes
+        chunk_data, buffer = read_chunk_data(conn, chunk_size, buffer)
+        full_body += chunk_data
+
+        print(f"  [chunk] {chunk_size} bytes: {chunk_data[:30]}{'...' if len(chunk_data) > 30 else ''}")
+
+    return full_body
+
+def read_chunked_body_with_buffer(conn, initial_buffer: bytes) -> bytes:
+    """
+    Same as read_chunked_body but starts with bytes already in buffer
+    (pulled in during header read).
+    """
+    full_body = b""
+    buffer = initial_buffer
+
+    while True:
+        chunk_size, buffer = read_chunk_size(conn, buffer)
+        if chunk_size == 0:
+            break
+        chunk_data, buffer = read_chunk_data(conn, chunk_size, buffer)
+        full_body += chunk_data
+        print(f"  [chunk] {chunk_size} bytes: {chunk_data[:30]}{'...' if len(chunk_data) > 30 else ''}")
+
+    return full_body
