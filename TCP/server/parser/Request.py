@@ -86,30 +86,6 @@ def parse_request(conn) -> HTTPRequest:
     body = validate_body(body)
     return HTTPRequest(request_line, headers, body)
 
-def start_server():
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.bind(("127.0.0.1", 8080))
-    server.listen(5)
-    print("Listening on http://127.0.0.1:8080 ...\n")
-
-    while True:
-        conn, addr = server.accept()
-        print(f"--- Connection from {addr} ---")
-        try:
-            req = parse_request(conn)
-            print(req)
-        except MalformedRequestLineError as e:
-            print(f"400 Bad Request: {e}")
-        except MethodNotAllowedError as e:
-            print(f"405 Method Not Allowed: {e}")
-        except UnsupportedVersionError as e:
-            print(f"505 Version Not Supported: {e}")
-        finally:
-            conn.close()
-        print()
-
-start_server()
 
 
 

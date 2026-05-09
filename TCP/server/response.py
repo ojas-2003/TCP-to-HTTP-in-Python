@@ -44,7 +44,7 @@ class HTTPResponse:
     status_code: int
     headers: dict = field(default_factory=dict)
     version: str = "HTTP/1.1"
-    Body: bytes = b""
+    body: bytes = b""
 
     def set_header(self, key: str, value: str):
         self.headers[key] = value
